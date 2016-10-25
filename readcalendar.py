@@ -1,10 +1,12 @@
 import os, sys
+'''
 import httplib2
 from apiclient import discovery
 from oauth2client import client
 from oauth2client import tools
 from oauth2client.file import Storage
-from datetime import datetime, tzinfo,timedelta
+'''
+from datetime import datetime
 import dateutil.parser
 import datetime
 
@@ -20,6 +22,7 @@ try:
 except ImportError:
     flags = None
 
+
 def time_range(datestr):
     date = dateutil.parser.parse(datestr)
 
@@ -27,6 +30,7 @@ def time_range(datestr):
     max_time = datetime.datetime(date.year, date.month, date.day, 23, 59, 59) + datetime.timedelta(hours=8)
 
     return min_time, max_time
+
 
 def get_credentials():
     """Gets valid user credentials from storage.
@@ -57,6 +61,7 @@ def get_credentials():
     print('-'* 50)
     return credentials
 
+
 def get_events(min_time, max_time):
     """Shows basic usage of the Google Calendar API.
 
@@ -84,6 +89,18 @@ def get_events(min_time, max_time):
         for event in events:
             start = event['start'].get('dateTime', event['start'].get('date'))
             print(start, event['summary'])
+
+
+def get_calendar_list(service):
+    calendar_result = service.calendarList.list()
+    calendars = calendar_result.get('items', [])
+    calendar_list = []
+    for calendar in calendars:
+        calendar_list.append(calendar['id'])
+
+    return calendar_list
+
+
 
 
 def main():
