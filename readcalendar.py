@@ -1,37 +1,32 @@
-from __future__ import print_function
+import os, sys
 import httplib2
-import os
-
 from apiclient import discovery
 from oauth2client import client
 from oauth2client import tools
 from oauth2client.file import Storage
 from datetime import datetime, tzinfo,timedelta
-from rfc3339 import rfc3339
-
+import dateutil.parser
 import datetime
-import argparse
-
 
 # If modifying these scopes, delete your previously saved credentials
 # at ~/.credentials/calendar-python-quickstart.json
 SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 CLIENT_SECRET_FILE = 'client_secret.json'
-APPLICATION_NAME = 'Google Calendar API Python Quickstart'
+APPLICATION_NAME = 'Bot Client'
 
+try:
+    import argparse
+    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
+except ImportError:
+    flags = None
 
-def convert_to_rfc3339(date):
-    year = int(date[:4])
-    month = int(date[4:6])
-    day = int(date[6:])
+def time_range(datestr):
+    date = dateutil.parser.parse(datestr)
 
-    min_time = datetime.datetime(year, month, day, 0, 0, 0)
-    max_time = datetime.datetime(year, month, day, 23, 59, 59)
-    #print(max_time)
-    min_time_rfc = rfc3339(min_time, utc=True, use_system_timezone=False)[:-1]+'+08:00'
-    max_time_rfc = rfc3339(max_time, utc=True, use_system_timezone=False)[:-1]+'+08:00'
-    return min_time_rfc, max_time_rfc
+    min_time = datetime.datetime(date.year, date.month, date.day, 0, 0, 0) + datetime.timedelta(hours=8)
+    max_time = datetime.datetime(date.year, date.month, date.day, 23, 59, 59) + datetime.timedelta(hours=8)
 
+    return min_time, max_time
 
 def get_credentials():
     """Gets valid user credentials from storage.
@@ -54,12 +49,15 @@ def get_credentials():
     if not credentials or credentials.invalid:
         flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
         flow.user_agent = APPLICATION_NAME
-        credentials = tools.run_flow(flow, store)
+        if flags:
+            credentials = tools.run_flow(flow, store, flags)
+        else:
+            credentials = tools.run(flow, store)
         print('Storing credentials to ' + credential_path)
+    print('-'* 50)
     return credentials
 
-
-def get_events(date):
+def get_events(min_time, max_time):
     """Shows basic usage of the Google Calendar API.
 
     Creates a Google Calendar API service object and outputs a list of the next
@@ -70,18 +68,17 @@ def get_events(date):
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
 
-    now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
-    min_time, max_time = convert_to_rfc3339(date)
-    #print(now)
-    #print(max_time, min_time)
+    print service.calendarList().list().execute()
+    print(service.calendarList)
 
     eventsResult = service.events().list(
-        calendarId='primary', timeMax=max_time, singleEvents=True, timeMin= min_time,
+        calendarId='primary', timeMax=max_time.isoformat() + 'Z', singleEvents=True,
+        timeMin=min_time.isoformat() + 'Z',
         orderBy='startTime').execute()
     events = eventsResult.get('items', [])
 
     if not events:
-        print('No  events found.')
+        print('No events found.')
     else:
         print('get %d events.' % len(events))
         for event in events:
@@ -90,11 +87,11 @@ def get_events(date):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('date', help='date to get events')
-    args = parser.parse_args()
-    get_events(args.date)
 
+    date = '20161025'
+    min_time, max_time = time_range(date)
+    print(min_time, max_time)
+    #get_events(min_time, max_time)
 
 if __name__ == '__main__':
     main()
