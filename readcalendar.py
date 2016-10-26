@@ -1,10 +1,13 @@
+from __future__ import print_function
+
 import os, sys
+import time
 import httplib2
 from apiclient import discovery
 from oauth2client import client
 from oauth2client import tools
 from oauth2client.file import Storage
-from datetime import datetime, tzinfo,timedelta
+from datetime import datetime
 import dateutil.parser
 import datetime
 
@@ -16,15 +19,19 @@ APPLICATION_NAME = 'Bot Client'
 
 try:
     import argparse
-    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
+    date_parser = argparse.ArgumentParser(add_help=False)
+    date_parser.add_argument("date", nargs='?',default=time.strftime('%Y%m%d',time.localtime()),
+                             help="date to search events")
+    flags = argparse.ArgumentParser(parents=[tools.argparser, date_parser]).parse_args()
 except ImportError:
     flags = None
+
 
 def time_range(datestr):
     date = dateutil.parser.parse(datestr)
 
-    min_time = datetime.datetime(date.year, date.month, date.day, 0, 0, 0) + datetime.timedelta(hours=8)
-    max_time = datetime.datetime(date.year, date.month, date.day, 23, 59, 59) + datetime.timedelta(hours=8)
+    min_time = datetime.datetime(date.year, date.month, date.day, 0, 0, 0) - datetime.timedelta(hours=8)
+    max_time = datetime.datetime(date.year, date.month, date.day, 23, 59, 59) - datetime.timedelta(hours=8)
 
     return min_time, max_time
 
@@ -57,6 +64,16 @@ def get_credentials():
     print('-'* 50)
     return credentials
 
+
+def get_calendar_id(service):
+    calendar_result = service.calendarList.list().execute()
+    calendar_list = calendar_result.get('items', [])
+    calendar_id = []
+    for calendar in calendar_list:
+        calendar_id.append(calendar['id'])
+    return calendar_id
+
+
 def get_events(min_time, max_time):
     """Shows basic usage of the Google Calendar API.
 
@@ -68,30 +85,36 @@ def get_events(min_time, max_time):
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
 
-    print service.calendarList().list().execute()
-    print(service.calendarList)
+    calendar_id = []
+    calendar_list = service.calendarList().list().execute().get('items', [])
+    for calendar in calendar_list:
+        calendar_id.append(calendar['id'])
 
-    eventsResult = service.events().list(
-        calendarId='primary', timeMax=max_time.isoformat() + 'Z', singleEvents=True,
-        timeMin=min_time.isoformat() + 'Z',
-        orderBy='startTime').execute()
-    events = eventsResult.get('items', [])
+    events = []
+    for calendarId in calendar_id:
+        eventsResult = service.events().list(
+            calendarId=calendarId, timeMax=max_time.isoformat() + 'Z', singleEvents=True,
+            timeMin=min_time.isoformat() + 'Z',
+            orderBy='startTime').execute()
+        events.extend(eventsResult.get('items', []))
 
     if not events:
         print('No events found.')
     else:
-        print('get %d events.' % len(events))
+        print('get %d events' % len(events))
         for event in events:
             start = event['start'].get('dateTime', event['start'].get('date'))
             print(start, event['summary'])
 
 
 def main():
-
-    date = '20161025'
+    if flags:
+        date = flags.date
+    else:
+        date = time.strftime('%Y%m%d', time.localtime())
     min_time, max_time = time_range(date)
-    print(min_time, max_time)
-    #get_events(min_time, max_time)
+    print(min_time+datetime.timedelta(hours=8), max_time+datetime.timedelta(hours=8))
+    get_events(min_time, max_time)
 
 if __name__ == '__main__':
     main()
